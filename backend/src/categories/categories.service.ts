@@ -2,24 +2,21 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { slugify } from '../common/utils';
+import { SlugService } from '../common/slug.service';
+import { ERROR_MESSAGES } from '../common/error-messages';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private slugService: SlugService,
+  ) {}
 
   async create(createCategoryDto: CreateCategoryDto) {
-    const slug = slugify(createCategoryDto.name);
-
-    // Ensure slug is unique
-    let uniqueSlug = slug;
-    let counter = 1;
-    while (
-      await this.prisma.category.findUnique({ where: { slug: uniqueSlug } })
-    ) {
-      uniqueSlug = `${slug}-${counter}`;
-      counter++;
-    }
+    const uniqueSlug = await this.slugService.generateUniqueSlug(
+      createCategoryDto.name,
+      'category',
+    );
 
     return this.prisma.category.create({
       data: {
@@ -67,7 +64,7 @@ export class CategoriesService {
     });
 
     if (!category) {
-      throw new NotFoundException('Category not found');
+      throw new NotFoundException(ERROR_MESSAGES.CATEGORY_NOT_FOUND);
     }
 
     return category;
@@ -86,7 +83,7 @@ export class CategoriesService {
     });
 
     if (!category) {
-      throw new NotFoundException('Category not found');
+      throw new NotFoundException(ERROR_MESSAGES.CATEGORY_NOT_FOUND);
     }
 
     return category;
@@ -98,7 +95,7 @@ export class CategoriesService {
     });
 
     if (!category) {
-      throw new NotFoundException('Category not found');
+      throw new NotFoundException(ERROR_MESSAGES.CATEGORY_NOT_FOUND);
     }
 
     const data: Partial<UpdateCategoryDto & { slug?: string }> = {
@@ -107,18 +104,11 @@ export class CategoriesService {
 
     // If name is being updated, update slug
     if (updateCategoryDto.name && updateCategoryDto.name !== category.name) {
-      const slug = slugify(updateCategoryDto.name);
-      let uniqueSlug = slug;
-      let counter = 1;
-      while (
-        await this.prisma.category.findFirst({
-          where: { slug: uniqueSlug, id: { not: id } },
-        })
-      ) {
-        uniqueSlug = `${slug}-${counter}`;
-        counter++;
-      }
-      data.slug = uniqueSlug;
+      data.slug = await this.slugService.generateUniqueSlug(
+        updateCategoryDto.name,
+        'category',
+        id,
+      );
     }
 
     return this.prisma.category.update({
@@ -137,7 +127,7 @@ export class CategoriesService {
     });
 
     if (!category) {
-      throw new NotFoundException('Category not found');
+      throw new NotFoundException(ERROR_MESSAGES.CATEGORY_NOT_FOUND);
     }
 
     // Check if category has products

@@ -1,10 +1,16 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { OrderStatus } from '@prisma/client';
+import { PaginationService } from '../common/pagination.service';
+import { USER_PUBLIC_SELECT } from '../common/user-selectors';
+import { ERROR_MESSAGES } from '../common/error-messages';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private paginationService: PaginationService,
+  ) {}
 
   async create(
     userId: string,
@@ -25,7 +31,7 @@ export class ReviewsService {
 
     if (!hasPurchased) {
       throw new BadRequestException(
-        'You can only review products you have purchased',
+        ERROR_MESSAGES.CAN_ONLY_REVIEW_PURCHASED_PRODUCTS,
       );
     }
 
@@ -40,7 +46,7 @@ export class ReviewsService {
     });
 
     if (existingReview) {
-      throw new BadRequestException('You have already reviewed this product');
+      throw new BadRequestException(ERROR_MESSAGES.REVIEW_ALREADY_EXISTS);
     }
 
     return this.prisma.review.create({
@@ -53,18 +59,14 @@ export class ReviewsService {
       },
       include: {
         user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
+          select: USER_PUBLIC_SELECT,
         },
       },
     });
   }
 
   async findByProduct(productId: string, page: number = 1, limit: number = 20) {
-    const skip = (page - 1) * limit;
+    const skip = this.paginationService.calculateSkip(page, limit);
 
     const [reviews, total] = await Promise.all([
       this.prisma.review.findMany({
@@ -74,11 +76,7 @@ export class ReviewsService {
         },
         include: {
           user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
+            select: USER_PUBLIC_SELECT,
           },
         },
         skip,
@@ -95,12 +93,11 @@ export class ReviewsService {
 
     return {
       reviews,
-      pagination: {
+      pagination: this.paginationService.calculatePagination(
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
-      },
+      ),
     };
   }
 

@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { DeliveryStatus } from '@prisma/client';
+import { USER_CONTACT_SELECT } from '../common/user-selectors';
+import { ERROR_MESSAGES } from '../common/error-messages';
 
 @Injectable()
 export class DeliveryService {
@@ -17,7 +19,7 @@ export class DeliveryService {
     });
 
     if (!order) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException(ERROR_MESSAGES.ORDER_NOT_FOUND);
     }
 
     // Find governorate
@@ -26,7 +28,7 @@ export class DeliveryService {
     });
 
     if (!governorate) {
-      throw new NotFoundException('Governorate not found');
+      throw new NotFoundException(ERROR_MESSAGES.GOVERNORATE_NOT_FOUND);
     }
 
     // Create delivery
@@ -57,12 +59,7 @@ export class DeliveryService {
           include: {
             address: true,
             user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-              },
+              select: USER_CONTACT_SELECT,
             },
           },
         },
@@ -77,11 +74,11 @@ export class DeliveryService {
     });
 
     if (!delivery) {
-      throw new NotFoundException('Delivery not found');
+      throw new NotFoundException(ERROR_MESSAGES.DELIVERY_NOT_FOUND);
     }
 
     if (delivery.driverId) {
-      throw new BadRequestException('Delivery already assigned');
+      throw new BadRequestException(ERROR_MESSAGES.DELIVERY_ALREADY_ASSIGNED);
     }
 
     return this.prisma.delivery.update({
@@ -112,11 +109,13 @@ export class DeliveryService {
     });
 
     if (!delivery) {
-      throw new NotFoundException('Delivery not found');
+      throw new NotFoundException(ERROR_MESSAGES.DELIVERY_NOT_FOUND);
     }
 
     if (driverId && delivery.driverId !== driverId) {
-      throw new BadRequestException('Delivery does not belong to driver');
+      throw new BadRequestException(
+        ERROR_MESSAGES.DELIVERY_NOT_BELONGS_TO_DRIVER,
+      );
     }
 
     const updateData: {
@@ -149,12 +148,7 @@ export class DeliveryService {
           include: {
             address: true,
             user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-              },
+              select: USER_CONTACT_SELECT,
             },
           },
         },

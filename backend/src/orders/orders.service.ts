@@ -9,12 +9,22 @@ import { PrismaService } from '../common/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus, UserRole, Prisma } from '@prisma/client';
+import { ProductHelperService } from '../common/product-helper.service';
+import { InventoryHelperService } from '../common/inventory-helper.service';
+import { OwnershipHelperService } from '../common/ownership-helper.service';
+import { USER_CONTACT_SELECT } from '../common/user-selectors';
+import { ERROR_MESSAGES } from '../common/error-messages';
 
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private productHelperService: ProductHelperService,
+    private inventoryHelperService: InventoryHelperService,
+    private ownershipHelperService: OwnershipHelperService,
+  ) {}
 
   async create(userId: string, createOrderDto: CreateOrderDto) {
     const { addressId, notes } = createOrderDto;
@@ -25,12 +35,14 @@ export class OrdersService {
     });
 
     if (!address) {
-      throw new NotFoundException('Address not found');
+      throw new NotFoundException(ERROR_MESSAGES.ADDRESS_NOT_FOUND);
     }
 
-    if (address.userId !== userId) {
-      throw new ForbiddenException('Address does not belong to user');
-    }
+    this.ownershipHelperService.verifyResourceOwnership(
+      address,
+      userId,
+      'address',
+    );
 
     // Get user's cart
     const cart = await this.prisma.cart.findUnique({
@@ -49,7 +61,7 @@ export class OrdersService {
     });
 
     if (!cart || cart.items.length === 0) {
-      throw new BadRequestException('Cart is empty');
+      throw new BadRequestException(ERROR_MESSAGES.CART_EMPTY);
     }
 
     // Verify all items are available and calculate totals
@@ -63,18 +75,13 @@ export class OrdersService {
     for (const item of cart.items) {
       const product = item.product;
 
-      if (!product.isActive) {
-        throw new BadRequestException(
-          `Product ${product.name} is no longer available`,
-        );
-      }
-
-      const availableQuantity = product.inventory?.quantity || 0;
-      if (availableQuantity < item.quantity) {
-        throw new BadRequestException(
-          `Insufficient stock for ${product.name}. Available: ${availableQuantity}`,
-        );
-      }
+      // Use helper services for validation
+      this.productHelperService.validateProductActive(product);
+      this.inventoryHelperService.validateProductStock(
+        product,
+        item.quantity,
+        product.name,
+      );
 
       const itemTotal = Number(product.price) * item.quantity;
       subtotal += itemTotal;
@@ -177,12 +184,7 @@ export class OrdersService {
         delivery: {
           include: {
             driver: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-              },
+              select: USER_CONTACT_SELECT,
             },
             governorate: true,
           },
@@ -197,13 +199,7 @@ export class OrdersService {
       where: { id },
       include: {
         user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true,
-          },
+          select: USER_CONTACT_SELECT,
         },
         address: true,
         items: {
@@ -219,12 +215,7 @@ export class OrdersService {
         delivery: {
           include: {
             driver: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-              },
+              select: USER_CONTACT_SELECT,
             },
             governorate: true,
           },
@@ -233,12 +224,12 @@ export class OrdersService {
     });
 
     if (!order) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException(ERROR_MESSAGES.ORDER_NOT_FOUND);
     }
 
     // Only customers can see their own orders, admins can see all
     if (role === UserRole.CUSTOMER && order.userId !== userId) {
-      throw new ForbiddenException('You can only view your own orders');
+      throw new ForbiddenException(ERROR_MESSAGES.CAN_ONLY_VIEW_OWN_ORDERS);
     }
 
     return order;
@@ -270,7 +261,9 @@ export class OrdersService {
       status === OrderStatus.CANCELLED &&
       order.status !== OrderStatus.PENDING
     ) {
-      throw new BadRequestException('Only pending orders can be cancelled');
+      throw new BadRequestException(
+        ERROR_MESSAGES.ONLY_PENDING_ORDERS_CAN_BE_CANCELLED,
+      );
     }
 
     // If cancelling, restore inventory

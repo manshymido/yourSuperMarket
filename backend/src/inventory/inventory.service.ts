@@ -1,21 +1,25 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { ProductHelperService } from '../common/product-helper.service';
 
 @Injectable()
 export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private productHelperService: ProductHelperService,
+  ) {}
 
   async updateInventory(productId: string, quantity: number) {
+    // Validate product exists
+    await this.productHelperService.validateProductExists(productId);
+
+    // Fetch product with inventory
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
       include: { inventory: true },
     });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
 
     // Create inventory if it doesn't exist
     if (!product.inventory) {

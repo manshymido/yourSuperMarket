@@ -6,12 +6,40 @@ import {
 import { PrismaService } from '../common/prisma.service';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
+import { ProductHelperService } from '../common/product-helper.service';
+import { InventoryHelperService } from '../common/inventory-helper.service';
+import { OwnershipHelperService } from '../common/ownership-helper.service';
+import { ERROR_MESSAGES } from '../common/error-messages';
 
 @Injectable()
 export class CartService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private productHelperService: ProductHelperService,
+    private inventoryHelperService: InventoryHelperService,
+    private ownershipHelperService: OwnershipHelperService,
+  ) {}
 
   async getCart(userId: string) {
+    const cart = await this.getOrCreateCart(userId);
+
+    // Filter out inactive products and check inventory
+    const validItems = cart.items.filter((item) => {
+      const product = item.product;
+      return (
+        product.isActive &&
+        this.inventoryHelperService.getAvailableQuantity(product) >=
+          item.quantity
+      );
+    });
+
+    return {
+      ...cart,
+      items: validItems,
+    };
+  }
+
+  private async getOrCreateCart(userId: string) {
     let cart = await this.prisma.cart.findUnique({
       where: { userId },
       include: {
@@ -49,55 +77,30 @@ export class CartService {
       });
     }
 
-    // Filter out inactive products and check inventory
-    const validItems = cart.items.filter((item) => {
-      const product = item.product;
-      return (
-        product.isActive && (product.inventory?.quantity || 0) >= item.quantity
-      );
-    });
-
-    return {
-      ...cart,
-      items: validItems,
-    };
+    return cart;
   }
 
   async addToCart(userId: string, addToCartDto: AddToCartDto) {
     const { productId, quantity } = addToCartDto;
 
     // Verify product exists and is active
-    const product = await this.prisma.product.findUnique({
+    const product = await this.productHelperService.validateProductExistsAndActive(
+      productId,
+    );
+    const productWithInventory = await this.prisma.product.findUnique({
       where: { id: productId },
       include: { inventory: true },
     });
 
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    if (!product.isActive) {
-      throw new BadRequestException('Product is not available');
-    }
-
     // Check inventory
-    const availableQuantity = product.inventory?.quantity || 0;
-    if (availableQuantity < quantity) {
-      throw new BadRequestException(
-        `Only ${availableQuantity} items available in stock`,
-      );
-    }
+    this.inventoryHelperService.validateProductStock(
+      productWithInventory!,
+      quantity,
+      product.name,
+    );
 
     // Get or create cart
-    let cart = await this.prisma.cart.findUnique({
-      where: { userId },
-    });
-
-    if (!cart) {
-      cart = await this.prisma.cart.create({
-        data: { userId },
-      });
-    }
+    const cart = await this.getOrCreateCart(userId);
 
     // Check if item already exists in cart
     const existingItem = await this.prisma.cartItem.findUnique({
@@ -112,11 +115,11 @@ export class CartService {
     if (existingItem) {
       // Update quantity
       const newQuantity = existingItem.quantity + quantity;
-      if (availableQuantity < newQuantity) {
-        throw new BadRequestException(
-          `Only ${availableQuantity} items available in stock`,
-        );
-      }
+      this.inventoryHelperService.validateProductStock(
+        productWithInventory,
+        newQuantity,
+        product.name,
+      );
 
       return this.prisma.cartItem.update({
         where: { id: existingItem.id },
@@ -169,20 +172,21 @@ export class CartService {
     });
 
     if (!cartItem) {
-      throw new NotFoundException('Cart item not found');
+      throw new NotFoundException(ERROR_MESSAGES.CART_ITEM_NOT_FOUND);
     }
 
-    if (cartItem.cart.userId !== userId) {
-      throw new BadRequestException('Cart item does not belong to user');
-    }
+    this.ownershipHelperService.verifyResourceOwnership(
+      cartItem.cart,
+      userId,
+      'cart item',
+    );
 
     // Check inventory
-    const availableQuantity = cartItem.product.inventory?.quantity || 0;
-    if (availableQuantity < quantity) {
-      throw new BadRequestException(
-        `Only ${availableQuantity} items available in stock`,
-      );
-    }
+    this.inventoryHelperService.validateProductStock(
+      cartItem.product,
+      quantity,
+      cartItem.product.name,
+    );
 
     return this.prisma.cartItem.update({
       where: { id: itemId },
@@ -206,12 +210,14 @@ export class CartService {
     });
 
     if (!cartItem) {
-      throw new NotFoundException('Cart item not found');
+      throw new NotFoundException(ERROR_MESSAGES.CART_ITEM_NOT_FOUND);
     }
 
-    if (cartItem.cart.userId !== userId) {
-      throw new BadRequestException('Cart item does not belong to user');
-    }
+    this.ownershipHelperService.verifyResourceOwnership(
+      cartItem.cart,
+      userId,
+      'cart item',
+    );
 
     await this.prisma.cartItem.delete({
       where: { id: itemId },

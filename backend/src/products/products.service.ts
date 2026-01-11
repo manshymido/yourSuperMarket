@@ -4,7 +4,11 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { CloudinaryService } from '../common/cloudinary.service';
-import { slugify } from '../common/utils';
+import { SlugService } from '../common/slug.service';
+import { PaginationService } from '../common/pagination.service';
+import { ProductHelperService } from '../common/product-helper.service';
+import { USER_PUBLIC_SELECT } from '../common/user-selectors';
+import { ERROR_MESSAGES } from '../common/error-messages';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -14,23 +18,19 @@ export class ProductsService {
   constructor(
     private prisma: PrismaService,
     private cloudinaryService: CloudinaryService,
+    private slugService: SlugService,
+    private paginationService: PaginationService,
+    private productHelperService: ProductHelperService,
   ) {}
 
   async create(
     createProductDto: CreateProductDto,
     files?: Express.Multer.File[],
   ) {
-    const slug = slugify(createProductDto.name);
-
-    // Ensure slug is unique
-    let uniqueSlug = slug;
-    let counter = 1;
-    while (
-      await this.prisma.product.findUnique({ where: { slug: uniqueSlug } })
-    ) {
-      uniqueSlug = `${slug}-${counter}`;
-      counter++;
-    }
+    const uniqueSlug = await this.slugService.generateUniqueSlug(
+      createProductDto.name,
+      'product',
+    );
 
     // Upload images if provided
     let imageUrls: string[] = createProductDto.images || [];
@@ -79,7 +79,7 @@ export class ProductsService {
       sortOrder = 'desc',
     } = query;
 
-    const skip = (page - 1) * limit;
+    const skip = this.paginationService.calculateSkip(page, limit);
 
     const where: Prisma.ProductWhereInput = {
       isActive: true,
@@ -130,55 +130,28 @@ export class ProductsService {
 
     return {
       products,
-      pagination: {
+      pagination: this.paginationService.calculatePagination(
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
-      },
+      ),
     };
   }
 
   async findOne(id: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
-      include: {
-        category: {
-          include: {
-            parent: true,
-          },
-        },
-        inventory: true,
-        reviews: {
-          where: { isApproved: true },
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-        },
-        _count: {
-          select: { reviews: true },
-        },
-      },
-    });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    return product;
+    return this.findProductWithDetails({ id }, 10);
   }
 
   async findBySlug(slug: string) {
+    return this.findProductWithDetails({ slug });
+  }
+
+  private async findProductWithDetails(
+    where: { id?: string; slug?: string },
+    reviewLimit?: number,
+  ) {
     const product = await this.prisma.product.findUnique({
-      where: { slug },
+      where: where.id ? { id: where.id } : { slug: where.slug! },
       include: {
         category: {
           include: {
@@ -190,14 +163,11 @@ export class ProductsService {
           where: { isApproved: true },
           include: {
             user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-              },
+              select: USER_PUBLIC_SELECT,
             },
           },
           orderBy: { createdAt: 'desc' },
+          ...(reviewLimit && { take: reviewLimit }),
         },
         _count: {
           select: { reviews: true },
@@ -206,7 +176,7 @@ export class ProductsService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new NotFoundException(ERROR_MESSAGES.PRODUCT_NOT_FOUND);
     }
 
     return product;
@@ -217,30 +187,17 @@ export class ProductsService {
     updateProductDto: UpdateProductDto,
     files?: Express.Multer.File[],
   ) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
-    });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
+    const product = await this.productHelperService.validateProductExists(id);
 
     const data: Prisma.ProductUpdateInput = { ...updateProductDto };
 
     // If name is being updated, update slug
     if (updateProductDto.name && updateProductDto.name !== product.name) {
-      const slug = slugify(updateProductDto.name);
-      let uniqueSlug = slug;
-      let counter = 1;
-      while (
-        await this.prisma.product.findFirst({
-          where: { slug: uniqueSlug, id: { not: id } },
-        })
-      ) {
-        uniqueSlug = `${slug}-${counter}`;
-        counter++;
-      }
-      data.slug = uniqueSlug;
+      data.slug = await this.slugService.generateUniqueSlug(
+        updateProductDto.name,
+        'product',
+        id,
+      );
     }
 
     // Handle image uploads
@@ -262,13 +219,7 @@ export class ProductsService {
   }
 
   async remove(id: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
-    });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
+    const product = await this.productHelperService.validateProductExists(id);
 
     // Delete images from Cloudinary
     if (product.images && product.images.length > 0) {

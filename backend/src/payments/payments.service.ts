@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { PaymentStatus, PaymentMethod, Prisma } from '@prisma/client';
+import { ERROR_MESSAGES } from '../common/error-messages';
 import axios from 'axios';
 
 @Injectable()
@@ -20,7 +21,7 @@ export class PaymentsService {
     });
 
     if (!order) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException(ERROR_MESSAGES.ORDER_NOT_FOUND);
     }
 
     // Check if payment already exists
@@ -49,7 +50,7 @@ export class PaymentsService {
       return this.initiatePaymobPayment(order);
     }
 
-    throw new BadRequestException('Invalid payment method');
+    throw new BadRequestException(ERROR_MESSAGES.INVALID_PAYMENT_METHOD);
   }
 
   private async initiatePaymobPayment(order: {
@@ -164,7 +165,7 @@ export class PaymentsService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Payment not found');
+      throw new NotFoundException(ERROR_MESSAGES.PAYMENT_NOT_FOUND);
     }
 
     let status: PaymentStatus = PaymentStatus.PENDING;

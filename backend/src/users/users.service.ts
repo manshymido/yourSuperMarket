@@ -7,21 +7,22 @@ import { PrismaService } from '../common/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
+import { OwnershipHelperService } from '../common/ownership-helper.service';
+import { USER_BASIC_SELECT } from '../common/user-selectors';
+import { ERROR_MESSAGES } from '../common/error-messages';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private ownershipHelperService: OwnershipHelperService,
+  ) {}
 
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
-        id: true,
-        email: true,
-        phone: true,
-        firstName: true,
-        lastName: true,
-        role: true,
+        ...USER_BASIC_SELECT,
         createdAt: true,
         updatedAt: true,
         addresses: {
@@ -31,7 +32,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
     }
 
     return user;
@@ -43,7 +44,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
     }
 
     // Check if email is being changed and if it's already taken
@@ -53,21 +54,14 @@ export class UsersService {
       });
 
       if (existingUser) {
-        throw new ForbiddenException('Email already in use');
+        throw new ForbiddenException(ERROR_MESSAGES.EMAIL_ALREADY_IN_USE);
       }
     }
 
     return this.prisma.user.update({
       where: { id: userId },
       data: updateProfileDto,
-      select: {
-        id: true,
-        email: true,
-        phone: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-      },
+      select: USER_BASIC_SELECT,
     });
   }
 
@@ -105,12 +99,14 @@ export class UsersService {
     });
 
     if (!address) {
-      throw new NotFoundException('Address not found');
+      throw new NotFoundException(ERROR_MESSAGES.ADDRESS_NOT_FOUND);
     }
 
-    if (address.userId !== userId) {
-      throw new ForbiddenException('You can only update your own addresses');
-    }
+    this.ownershipHelperService.verifyResourceOwnership(
+      address,
+      userId,
+      'address',
+    );
 
     // If setting as default, unset other defaults
     if (updateAddressDto.isDefault) {
@@ -132,12 +128,14 @@ export class UsersService {
     });
 
     if (!address) {
-      throw new NotFoundException('Address not found');
+      throw new NotFoundException(ERROR_MESSAGES.ADDRESS_NOT_FOUND);
     }
 
-    if (address.userId !== userId) {
-      throw new ForbiddenException('You can only delete your own addresses');
-    }
+    this.ownershipHelperService.verifyResourceOwnership(
+      address,
+      userId,
+      'address',
+    );
 
     await this.prisma.address.delete({
       where: { id: addressId },

@@ -16,6 +16,8 @@ import {
   ResetPasswordDto,
 } from './dto/reset-password.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { USER_BASIC_SELECT } from '../common/user-selectors';
+import { ERROR_MESSAGES } from '../common/error-messages';
 import { randomBytes } from 'crypto';
 
 @Injectable()
@@ -31,9 +33,7 @@ export class AuthService {
   async register(registerDto: RegisterDto) {
     const { email, phone, password, firstName, lastName } = registerDto;
 
-    if (!email && !phone) {
-      throw new BadRequestException('Either email or phone is required');
-    }
+    this.validateEmailOrPhone(email, phone);
 
     // Check if user exists
     if (email) {
@@ -41,7 +41,7 @@ export class AuthService {
         where: { email },
       });
       if (existingUser) {
-        throw new ConflictException('User with this email already exists');
+        throw new ConflictException(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS);
       }
     }
 
@@ -50,7 +50,7 @@ export class AuthService {
         where: { phone },
       });
       if (existingUser) {
-        throw new ConflictException('User with this phone already exists');
+        throw new ConflictException(ERROR_MESSAGES.PHONE_ALREADY_EXISTS);
       }
     }
 
@@ -88,9 +88,7 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { email, phone, password } = loginDto;
 
-    if (!email && !phone) {
-      throw new BadRequestException('Either email or phone is required');
-    }
+    this.validateEmailOrPhone(email, phone);
 
     // Find user
     const user = await this.prisma.user.findFirst({
@@ -100,17 +98,17 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(ERROR_MESSAGES.INVALID_CREDENTIALS);
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException('Account is inactive');
+      throw new UnauthorizedException(ERROR_MESSAGES.ACCOUNT_INACTIVE);
     }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(ERROR_MESSAGES.INVALID_CREDENTIALS);
     }
 
     // Generate tokens
@@ -149,7 +147,7 @@ export class AuthService {
       }
 
       if (!tokenRecord.user.isActive) {
-        throw new UnauthorizedException('User is inactive');
+        throw new UnauthorizedException(ERROR_MESSAGES.ACCOUNT_INACTIVE);
       }
 
       // Delete old refresh token
@@ -261,12 +259,14 @@ export class AuthService {
     });
 
     if (!resetToken) {
-      throw new BadRequestException('Invalid or expired reset token');
+      throw new BadRequestException(
+        ERROR_MESSAGES.INVALID_OR_EXPIRED_RESET_TOKEN,
+      );
     }
 
     // Check if token has been used
     if (resetToken.used) {
-      throw new BadRequestException('This reset token has already been used');
+      throw new BadRequestException(ERROR_MESSAGES.RESET_TOKEN_ALREADY_USED);
     }
 
     // Check if token has expired
@@ -276,14 +276,12 @@ export class AuthService {
         where: { id: resetToken.id },
         data: { used: true },
       });
-      throw new BadRequestException(
-        'Reset token has expired. Please request a new one.',
-      );
+      throw new BadRequestException(ERROR_MESSAGES.RESET_TOKEN_EXPIRED);
     }
 
     // Check if user is active
     if (!resetToken.user.isActive) {
-      throw new BadRequestException('User account is inactive');
+      throw new BadRequestException(ERROR_MESSAGES.USER_INACTIVE);
     }
 
     // Hash new password
@@ -337,6 +335,12 @@ export class AuthService {
     }
 
     return { message: 'Password reset successfully' };
+  }
+
+  private validateEmailOrPhone(email?: string, phone?: string): void {
+    if (!email && !phone) {
+      throw new BadRequestException(ERROR_MESSAGES.EMAIL_OR_PHONE_REQUIRED);
+    }
   }
 
   async logout(userId: string, refreshToken: string) {

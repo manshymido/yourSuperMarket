@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { PaginationService } from '../common/pagination.service';
+import { USER_BASIC_SELECT, USER_CONTACT_SELECT } from '../common/user-selectors';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private paginationService: PaginationService,
+  ) {}
 
   async getDashboardStats() {
     const [totalUsers, totalOrders, totalProducts, totalRevenue] =
@@ -22,12 +27,7 @@ export class AdminService {
       orderBy: { createdAt: 'desc' },
       include: {
         user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
+          select: USER_CONTACT_SELECT,
         },
         items: {
           include: {
@@ -49,17 +49,12 @@ export class AdminService {
   }
 
   async getAllUsers(page: number = 1, limit: number = 20) {
-    const skip = (page - 1) * limit;
+    const skip = this.paginationService.calculateSkip(page, limit);
 
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         select: {
-          id: true,
-          email: true,
-          phone: true,
-          firstName: true,
-          lastName: true,
-          role: true,
+          ...USER_BASIC_SELECT,
           isActive: true,
           createdAt: true,
         },
@@ -72,28 +67,22 @@ export class AdminService {
 
     return {
       users,
-      pagination: {
+      pagination: this.paginationService.calculatePagination(
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
-      },
+      ),
     };
   }
 
   async getAllOrders(page: number = 1, limit: number = 20) {
-    const skip = (page - 1) * limit;
+    const skip = this.paginationService.calculateSkip(page, limit);
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
         include: {
           user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
+            select: USER_CONTACT_SELECT,
           },
           items: {
             include: {
@@ -112,12 +101,11 @@ export class AdminService {
 
     return {
       orders,
-      pagination: {
+      pagination: this.paginationService.calculatePagination(
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
-      },
+      ),
     };
   }
 }
