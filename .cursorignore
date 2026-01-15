@@ -1,0 +1,14 @@
+!.env
+!.env.example
+!.env.development
+!.env.production
+!.env.test
+!.env.development.example
+!.env.production.example
+!.env.test.example
+!.env.development.production
+!.env.development.test
+!.env.production.development
+!.env.production.test
+!.env.test.development
+!.env.test.production
