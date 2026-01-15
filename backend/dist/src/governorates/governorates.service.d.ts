@@ -3,12 +3,12 @@ export declare class GovernoratesService {
     private prisma;
     constructor(prisma: PrismaService);
     findAll(): Promise<{
-        name: string;
         id: string;
-        createdAt: Date;
+        name: string;
         isActive: boolean;
+        createdAt: Date;
         updatedAt: Date;
-        nameAr: string | null;
         deliveryFee: import("@prisma/client-runtime-utils").Decimal;
+        nameAr: string | null;
     }[]>;
 }

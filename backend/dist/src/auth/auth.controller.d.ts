@@ -11,11 +11,11 @@ export declare class AuthController {
         accessToken: string;
         refreshToken: string;
         user: {
+            id: string;
             email: string | null;
             phone: string | null;
             firstName: string | null;
             lastName: string | null;
-            id: string;
             role: import("@prisma/client").$Enums.UserRole;
         };
     }>;

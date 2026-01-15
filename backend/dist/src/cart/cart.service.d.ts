@@ -14,152 +14,152 @@ export declare class CartService {
         items: ({
             product: {
                 category: {
-                    description: string | null;
-                    name: string;
                     id: string;
-                    createdAt: Date;
+                    name: string;
+                    slug: string;
+                    description: string | null;
                     isActive: boolean;
+                    createdAt: Date;
                     updatedAt: Date;
                     image: string | null;
                     parentId: string | null;
-                    slug: string;
                 };
                 inventory: {
                     id: string;
                     createdAt: Date;
                     updatedAt: Date;
+                    productId: string;
                     quantity: number;
                     lowStockThreshold: number;
                     reserved: number;
-                    productId: string;
                 } | null;
             } & {
-                description: string | null;
-                name: string;
                 id: string;
-                createdAt: Date;
-                isActive: boolean;
-                updatedAt: Date;
+                name: string;
                 slug: string;
+                description: string | null;
                 price: import("@prisma/client-runtime-utils").Decimal;
                 compareAtPrice: import("@prisma/client-runtime-utils").Decimal | null;
                 sku: string | null;
                 barcode: string | null;
                 categoryId: string;
                 images: string[];
+                isActive: boolean;
                 isFeatured: boolean;
                 weight: import("@prisma/client-runtime-utils").Decimal | null;
                 unit: string | null;
+                createdAt: Date;
+                updatedAt: Date;
             };
         } & {
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            quantity: number;
-            productId: string;
             cartId: string;
+            productId: string;
+            quantity: number;
         })[];
         id: string;
         createdAt: Date;
-        userId: string;
         updatedAt: Date;
+        userId: string;
     }>;
     private getOrCreateCart;
     addToCart(userId: string, addToCartDto: AddToCartDto): Promise<{
         product: {
             category: {
-                description: string | null;
-                name: string;
                 id: string;
-                createdAt: Date;
+                name: string;
+                slug: string;
+                description: string | null;
                 isActive: boolean;
+                createdAt: Date;
                 updatedAt: Date;
                 image: string | null;
                 parentId: string | null;
-                slug: string;
             };
             inventory: {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                productId: string;
                 quantity: number;
                 lowStockThreshold: number;
                 reserved: number;
-                productId: string;
             } | null;
         } & {
-            description: string | null;
-            name: string;
             id: string;
-            createdAt: Date;
-            isActive: boolean;
-            updatedAt: Date;
+            name: string;
             slug: string;
+            description: string | null;
             price: import("@prisma/client-runtime-utils").Decimal;
             compareAtPrice: import("@prisma/client-runtime-utils").Decimal | null;
             sku: string | null;
             barcode: string | null;
             categoryId: string;
             images: string[];
+            isActive: boolean;
             isFeatured: boolean;
             weight: import("@prisma/client-runtime-utils").Decimal | null;
             unit: string | null;
+            createdAt: Date;
+            updatedAt: Date;
         };
     } & {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        quantity: number;
-        productId: string;
         cartId: string;
+        productId: string;
+        quantity: number;
     }>;
     updateCartItem(userId: string, itemId: string, updateCartItemDto: UpdateCartItemDto): Promise<{
         product: {
             category: {
-                description: string | null;
-                name: string;
                 id: string;
-                createdAt: Date;
+                name: string;
+                slug: string;
+                description: string | null;
                 isActive: boolean;
+                createdAt: Date;
                 updatedAt: Date;
                 image: string | null;
                 parentId: string | null;
-                slug: string;
             };
             inventory: {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                productId: string;
                 quantity: number;
                 lowStockThreshold: number;
                 reserved: number;
-                productId: string;
             } | null;
         } & {
-            description: string | null;
-            name: string;
             id: string;
-            createdAt: Date;
-            isActive: boolean;
-            updatedAt: Date;
+            name: string;
             slug: string;
+            description: string | null;
             price: import("@prisma/client-runtime-utils").Decimal;
             compareAtPrice: import("@prisma/client-runtime-utils").Decimal | null;
             sku: string | null;
             barcode: string | null;
             categoryId: string;
             images: string[];
+            isActive: boolean;
             isFeatured: boolean;
             weight: import("@prisma/client-runtime-utils").Decimal | null;
             unit: string | null;
+            createdAt: Date;
+            updatedAt: Date;
         };
     } & {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        quantity: number;
-        productId: string;
         cartId: string;
+        productId: string;
+        quantity: number;
     }>;
     removeFromCart(userId: string, itemId: string): Promise<{
         message: string;

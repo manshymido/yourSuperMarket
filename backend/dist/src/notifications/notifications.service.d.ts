@@ -5,22 +5,22 @@ export declare class NotificationsService {
     private transporter;
     constructor(prisma: PrismaService);
     createNotification(userId: string, title: string, message: string, type: string): Promise<{
-        message: string;
         id: string;
-        title: string;
-        type: string;
-        isRead: boolean;
         createdAt: Date;
         userId: string;
+        title: string;
+        message: string;
+        type: string;
+        isRead: boolean;
     }>;
     getUserNotifications(userId: string): Promise<{
-        message: string;
         id: string;
-        title: string;
-        type: string;
-        isRead: boolean;
         createdAt: Date;
         userId: string;
+        title: string;
+        message: string;
+        type: string;
+        isRead: boolean;
     }[]>;
     markAsRead(userId: string, notificationId: string): Promise<import("@prisma/client").Prisma.BatchPayload>;
     sendEmail(to: string, subject: string, html: string): Promise<void>;

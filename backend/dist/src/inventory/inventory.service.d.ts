@@ -9,37 +9,37 @@ export declare class InventoryService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        productId: string;
         quantity: number;
         lowStockThreshold: number;
         reserved: number;
-        productId: string;
     }>;
     getLowStockItems(): Promise<({
         product: {
-            description: string | null;
-            name: string;
             id: string;
-            createdAt: Date;
-            isActive: boolean;
-            updatedAt: Date;
+            name: string;
             slug: string;
+            description: string | null;
             price: import("@prisma/client-runtime-utils").Decimal;
             compareAtPrice: import("@prisma/client-runtime-utils").Decimal | null;
             sku: string | null;
             barcode: string | null;
             categoryId: string;
             images: string[];
+            isActive: boolean;
             isFeatured: boolean;
             weight: import("@prisma/client-runtime-utils").Decimal | null;
             unit: string | null;
+            createdAt: Date;
+            updatedAt: Date;
         };
     } & {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        productId: string;
         quantity: number;
         lowStockThreshold: number;
         reserved: number;
-        productId: string;
     })[]>;
 }

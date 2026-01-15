@@ -4,13 +4,13 @@ export declare class NotificationsController {
     private readonly notificationsService;
     constructor(notificationsService: NotificationsService);
     getUserNotifications(user: CurrentUserPayload): Promise<{
-        message: string;
         id: string;
-        title: string;
-        type: string;
-        isRead: boolean;
         createdAt: Date;
         userId: string;
+        title: string;
+        message: string;
+        type: string;
+        isRead: boolean;
     }[]>;
     markAsRead(user: CurrentUserPayload, notificationId: string): Promise<import("@prisma/client").Prisma.BatchPayload>;
 }
